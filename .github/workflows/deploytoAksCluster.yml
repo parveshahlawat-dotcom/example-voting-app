@@ -1,0 +1,50 @@
+on: [push]
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
+    
+    - uses: azure/docker-login@v1
+      with:
+        login-server: parlab123demo.azurecr.io
+        username: ${{ secrets.acr_parlab123demo_username }}
+        password: ${{ secrets.acr_parlab123demo_password }}
+    
+    - name: Build and push image to ACR
+      id: build-image
+      run: |
+        docker build "$GITHUB_WORKSPACE/result" -f  "result/Dockerfile" -t parlab123demo.azurecr.io/testkube:${{ github.sha }}
+        docker push parlab123demo.azurecr.io/testkube:${{ github.sha }}
+    
+    - uses: azure/k8s-set-context@v1
+      with:
+         kubeconfig: ${{ secrets.aks_testkube_kubeConfig }}
+      id: login
+    
+    - name: Create namespace
+      run: |
+        namespacePresent=`kubectl get namespace | grep testkube03cf | wc -l`
+        if [ $namespacePresent -eq 0 ]
+        then
+            echo `kubectl create namespace testkube03cf`
+        fi
+
+    - uses: azure/k8s-create-secret@v1
+      with:
+        namespace: testkube03cf
+        container-registry-url: parlab123demo.azurecr.io
+        container-registry-username: ${{ secrets.acr_parlab123demo_username }}
+        container-registry-password: ${{ secrets.acr_parlab123demo_password }}
+        secret-name: testkubedockerauth
+       
+    - uses: azure/k8s-deploy@v1
+      with:
+        namespace: testkube03cf
+        manifests: |
+          manifests/deployment.yml
+          manifests/service.yml
+        images: |
+          parlab123demo.azurecr.io/testkube:${{ github.sha }}
+        imagepullsecrets: |
+          testkubedockerauth
