@@ -1,0 +1,16 @@
+apiVersion : apps/v1beta1
+kind: Deployment
+metadata:
+  name: "testkube"
+spec:
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: "testkube"
+    spec:
+      containers:
+        - name: "testkube"
+          image: "parlab123demo.azurecr.io/testkube"
+          ports:
+          - containerPort: 80
